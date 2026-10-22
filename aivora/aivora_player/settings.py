@@ -5,6 +5,10 @@ from .dependencies import filedialog, tk
 
 
 class SettingsMixin:
+    def show_settings(self):
+        """Studio-style public action used by the header button."""
+        self.open_settings()
+
     def open_settings(self):
         dialog = tk.Toplevel(self)
         dialog.title("Aivora • Paramètres")
@@ -44,6 +48,10 @@ class SettingsMixin:
             dialog, text="Enregistrer et analyser", command=apply, bg=ACCENT, fg="white",
             activebackground=ACCENT_HOVER, relief="flat", font=("Segoe UI", 10, "bold"), padx=16, pady=9
         ).pack(anchor="e", padx=28, pady=24)
+
+    def show_version(self):
+        """Open the V1.0 modal from the header, like Aivora Studio."""
+        self.open_about()
 
     def open_about(self):
         dialog = tk.Toplevel(self)

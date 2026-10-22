@@ -14,8 +14,8 @@ class Aivora(InterfaceMixin, LibraryMixin, PlayerMixin, SettingsMixin, tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"{APP_NAME} • V{VERSION}")
-        self.geometry("1180x720")
-        self.minsize(900, 580)
+        self.geometry("1150x850")
+        self.minsize(1000, 780)
         self.configure(bg=BG)
 
         self.settings = load_settings()

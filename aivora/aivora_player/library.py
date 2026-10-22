@@ -17,6 +17,7 @@ class LibraryMixin:
 
     def scan_library(self):
         self.artist_title.configure(text="Analyse de la bibliothèque…")
+        self.library_status.configure(text="Analyse en cours…")
         self.artist_list.delete(0, "end")
         self.tracks.delete(*self.tracks.get_children())
         threading.Thread(target=self._scan_worker, daemon=True).start()
@@ -67,9 +68,13 @@ class LibraryMixin:
         for name in self.artists:
             self.artist_list.insert("end", name)
         if self.artists:
+            self.library_status.configure(
+                text=f"{len(self.artists)} artiste{'s' if len(self.artists) > 1 else ''}"
+            )
             self.artist_list.selection_set(0)
             self.show_artist()
         else:
+            self.library_status.configure(text="Aucun artiste trouvé")
             self.artist_title.configure(text="Aucun artiste trouvé")
             self.artist_detail.configure(
                 text="Choisissez le dossier de votre bibliothèque dans Paramètres."

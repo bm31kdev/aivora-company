@@ -49,3 +49,10 @@ class PlayerMixin:
             pygame.mixer.music.unpause()
             self.play_btn.configure(text="❚❚")
         self.is_playing = not self.is_playing
+
+    def stop_playback(self):
+        """Stop the player and reset the visible play state."""
+        if pygame and self.player_ready:
+            pygame.mixer.music.stop()
+        self.is_playing = False
+        self.play_btn.configure(text="▶")
