@@ -1,7 +1,5 @@
 """Interface behaviors for Aivora Studio."""
 
-from datetime import datetime, timedelta
-
 from .dependencies import (
     queue,
     threading,
@@ -34,32 +32,6 @@ from .artist_folders import list_artist_folder_names
 class InterfaceMixin:
 
     CREATE_ARTIST_OPTION = "＋ Créer un nouveau dossier artiste…"
-
-    FIRST_UPDATE_AT = datetime(2026, 10, 9, 18)
-    UPDATE_INTERVAL = timedelta(days=7)
-    FRENCH_MONTHS = (
-        "janvier",
-        "février",
-        "mars",
-        "avril",
-        "mai",
-        "juin",
-        "juillet",
-        "août",
-        "septembre",
-        "octobre",
-        "novembre",
-        "décembre",
-    )
-    FRENCH_DAYS = (
-        "lundi",
-        "mardi",
-        "mercredi",
-        "jeudi",
-        "vendredi",
-        "samedi",
-        "dimanche",
-    )
 
     def setup_styles(self):
 
@@ -208,46 +180,6 @@ class InterfaceMixin:
             pady=8,
         ).pack(side="right")
 
-        self.update_countdown_card = tk.Frame(
-            self,
-            bg=CARD,
-            highlightbackground=BORDER,
-            highlightthickness=1,
-        )
-        self.update_countdown_card.pack(
-            fill="x",
-            padx=30,
-            pady=(0, 15),
-        )
-        countdown_content = tk.Frame(
-            self.update_countdown_card,
-            bg=CARD,
-        )
-        countdown_content.pack(fill="x", padx=16, pady=11)
-        tk.Label(
-            countdown_content,
-            text="PROCHAINE MISE À JOUR",
-            bg=CARD,
-            fg=MUTED,
-            font=("Segoe UI", 8, "bold"),
-        ).pack(side="left")
-        self.update_countdown_label = tk.Label(
-            countdown_content,
-            text="Calcul…",
-            bg=CARD,
-            fg=ACCENT_HOVER,
-            font=("Segoe UI", 11, "bold"),
-        )
-        self.update_countdown_label.pack(side="right")
-        self.update_countdown_date_label = tk.Label(
-            countdown_content,
-            text="Chaque vendredi à 18 h",
-            bg=CARD,
-            fg=MUTED,
-            font=("Segoe UI", 8),
-        )
-        self.update_countdown_date_label.pack(side="right", padx=(0, 14))
-
         # Zone de dépôt
         self.drop_zone = tk.Frame(
             self,
@@ -388,7 +320,6 @@ class InterfaceMixin:
         self.create_metadata_panel(content)
         self.create_cover_panel(content)
         self.polish_widget_tree(self)
-        self.update_release_countdown()
 
     def refresh_artist_options(self):
         if self.artist_folder_scan_running:
@@ -502,49 +433,6 @@ class InterfaceMixin:
                 ),
                 fg=ACCENT_HOVER,
             )
-
-    @staticmethod
-    def format_update_countdown(now, target):
-
-        remaining_seconds = max(0, int((target - now).total_seconds()))
-        days, remaining_seconds = divmod(remaining_seconds, 24 * 60 * 60)
-        hours, remaining_seconds = divmod(remaining_seconds, 60 * 60)
-        minutes, seconds = divmod(remaining_seconds, 60)
-
-        if days:
-            remaining = f"{days} j {hours:02} h {minutes:02} min {seconds:02} s"
-        else:
-            remaining = f"{hours:02} h {minutes:02} min {seconds:02} s"
-
-        return remaining
-
-    @classmethod
-    def get_next_update_at(cls, now):
-
-        if now < cls.FIRST_UPDATE_AT:
-            return cls.FIRST_UPDATE_AT
-
-        elapsed = now - cls.FIRST_UPDATE_AT
-        elapsed_weeks = elapsed // cls.UPDATE_INTERVAL
-        return cls.FIRST_UPDATE_AT + cls.UPDATE_INTERVAL * (elapsed_weeks + 1)
-
-    def update_release_countdown(self):
-
-        now = datetime.now()
-        target = self.get_next_update_at(now)
-        remaining = self.format_update_countdown(now, target)
-        day = self.FRENCH_DAYS[target.weekday()]
-        month = self.FRENCH_MONTHS[target.month - 1]
-        date_text = (
-            f"{day} {target.day} {month} {target.year} à "
-            f"{target.hour:02} h"
-        )
-
-        self.update_countdown_label.config(text=remaining)
-        self.update_countdown_date_label.config(
-            text=f"{date_text} · chaque vendredi à 18 h"
-        )
-        self.after(1000, self.update_release_countdown)
 
     def update_content_scroll_region(self, event=None):
 
