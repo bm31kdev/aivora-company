@@ -1,0 +1,2 @@
+# Dépendances partagées par Aivora et Aivora Studio V1.0.
+-r aivora/requirements.txt

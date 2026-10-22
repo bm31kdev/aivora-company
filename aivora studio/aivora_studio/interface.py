@@ -29,7 +29,6 @@ from .helpers import (
     uppercase_text,
 )
 from .artist_folders import list_artist_folder_names
-from .version_history import VERSION_HISTORY
 
 
 class InterfaceMixin:
@@ -199,17 +198,11 @@ class InterfaceMixin:
             pady=8,
         ).pack(side="right", padx=(8, 0))
 
-        tk.Button(
+        tk.Label(
             header_actions,
-            text=f"V{VERSION}  •  Versions",
-            command=self.show_changelog,
+            text=f"V{VERSION}",
             bg=ACCENT,
             fg="white",
-            activebackground=ACCENT_HOVER,
-            activeforeground="white",
-            relief="flat",
-            borderwidth=0,
-            cursor="hand2",
             font=("Segoe UI", 9, "bold"),
             padx=14,
             pady=8,
