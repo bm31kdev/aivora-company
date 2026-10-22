@@ -17,6 +17,9 @@ Le lecteur reprend l’organisation modulaire d’Aivora Studio :
 | `aivora_player/dependencies.py` | Centralise les dépendances communes. |
 | `aivora_player/main.py` | Point d’entrée de l’application. |
 
+Les dossiers sélectionnés dans Paramètres sont conservés après fermeture dans
+`%APPDATA%\Aivora\settings.json`, séparément des réglages d’Aivora Studio.
+
 Depuis la racine du dépôt, double-cliquez sur
 [`Start Aivora Company.bat`](../Start%20Aivora%20Company.bat) : il prépare un
 environnement Python commun, installe les dépendances des deux applications et

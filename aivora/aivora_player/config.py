@@ -2,6 +2,7 @@
 
 import json
 import os
+import tempfile
 from pathlib import Path
 
 APP_NAME = "Aivora"
@@ -33,9 +34,23 @@ def load_settings():
 
 
 def save_settings(settings):
-    """Persist library paths in the user profile, like Aivora Studio."""
+    """Persist settings atomically in ``%APPDATA%\\Aivora\\settings.json``."""
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    SETTINGS_PATH.write_text(
-        json.dumps(settings, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=SETTINGS_PATH.parent,
+            prefix=".settings-",
+            suffix=".json",
+            delete=False,
+        ) as settings_file:
+            json.dump(settings, settings_file, indent=2, ensure_ascii=False)
+            settings_file.write("\n")
+            temporary_path = Path(settings_file.name)
+        temporary_path.replace(SETTINGS_PATH)
+    except OSError:
+        if temporary_path and temporary_path.exists():
+            temporary_path.unlink()
+        raise
