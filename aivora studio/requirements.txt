@@ -1,0 +1,5 @@
+pygame>=2.5
+mutagen>=1.47
+tkinterdnd2
+Pillow
+imageio-ffmpeg
