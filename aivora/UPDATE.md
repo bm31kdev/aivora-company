@@ -1,5 +1,12 @@
 # Journal des mises à jour — Aivora
 
+## Version 1.1.03 — 23 octobre 2026
+
+- Ajout d’une file de lecture prioritaire et réorganisable.
+- Action « Lire ensuite » disponible dans la barre et sur chaque ligne de piste.
+- Albums enrichis : pochette, durée totale, ordre CD/piste et lecture complète.
+- Ajout du muet, volume précis, raccourcis clavier et diagnostics de lecture.
+
 ## Version 1.1.02 — 23 octobre 2026
 
 - Commandes de lecture réorganisées dans une barre centrée, plus lisible.

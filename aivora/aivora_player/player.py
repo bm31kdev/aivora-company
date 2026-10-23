@@ -2,11 +2,128 @@
 
 import random
 
-from .config import save_settings
-from .dependencies import messagebox, pygame
+from .config import ACCENT, ACCENT_HOVER, BG, BORDER, CARD, CARD_2, MUTED, TEXT, save_settings
+from .dependencies import messagebox, pygame, tk
 
 
 class PlayerMixin:
+    def queue_selected_track(self):
+        """Put the selected library track immediately after the current queue."""
+        track = self.get_selected_track()
+        if not track:
+            messagebox.showinfo("FILE DE LECTURE", "Sélectionnez d’abord un titre à lire ensuite.", parent=self)
+            return
+        self.enqueue_track(track)
+
+    def enqueue_track(self, track):
+        """Append a track to the user-controlled next-up list."""
+        if not self.is_playing:
+            self.current_track = track
+            self.current_artist = self.artist_name_for_track(track)
+            self.start_playback()
+            return
+        if track == self.current_track or track in self.play_queue:
+            messagebox.showinfo("FILE DE LECTURE", "Ce titre est déjà en cours ou dans la file.", parent=self)
+            return
+        self.play_queue.append(track)
+        self.update_queue_button()
+        self.player_subtitle.configure(text=f"{track.title} sera lu juste après.")
+
+    def update_queue_button(self):
+        if hasattr(self, "queue_btn"):
+            self.queue_btn.configure(text=f"☷  File ({len(self.play_queue)})")
+
+    def show_play_queue(self):
+        dialog = tk.Toplevel(self)
+        dialog.title("AIVORA • FILE DE LECTURE")
+        dialog.geometry("560x470")
+        dialog.minsize(440, 360)
+        dialog.configure(bg=BG)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        tk.Label(dialog, text="File de lecture", bg=BG, fg=TEXT, font=("Segoe UI", 18, "bold")).pack(
+            anchor="w", padx=22, pady=(20, 3)
+        )
+        tk.Label(
+            dialog,
+            text="Les titres sont lus dans cet ordre avant la suite normale de l’album ou de la liste.",
+            bg=BG,
+            fg=MUTED,
+            font=("Segoe UI", 9),
+            wraplength=500,
+            justify="left",
+        ).pack(anchor="w", padx=22, pady=(0, 14))
+
+        listbox = tk.Listbox(
+            dialog, bg=CARD, fg=TEXT, selectbackground=ACCENT, selectforeground="white",
+            activestyle="none", borderwidth=0, highlightthickness=1, highlightbackground=BORDER,
+            font=("Segoe UI", 10), exportselection=False,
+        )
+        listbox.pack(fill="both", expand=True, padx=22)
+
+        def refresh():
+            listbox.delete(0, "end")
+            for index, track in enumerate(self.play_queue, start=1):
+                artist = track.artist or self.artist_name_for_track(track)
+                listbox.insert("end", f"{index}.  {track.title}  —  {artist}")
+            if not self.play_queue:
+                listbox.insert("end", "La file est vide.")
+            self.update_queue_button()
+
+        def selected_index():
+            selected = listbox.curselection()
+            return selected[0] if selected and selected[0] < len(self.play_queue) else None
+
+        def move(offset):
+            index = selected_index()
+            if index is None:
+                return
+            destination = index + offset
+            if not 0 <= destination < len(self.play_queue):
+                return
+            self.play_queue[index], self.play_queue[destination] = (
+                self.play_queue[destination], self.play_queue[index]
+            )
+            refresh()
+            listbox.selection_set(destination)
+
+        def remove():
+            index = selected_index()
+            if index is None:
+                return
+            self.play_queue.pop(index)
+            refresh()
+
+        def play_now():
+            index = selected_index()
+            if index is None:
+                return
+            self.current_track = self.play_queue.pop(index)
+            self.current_artist = self.artist_name_for_track(self.current_track)
+            self.update_queue_button()
+            self.select_current_track_in_table()
+            self.start_playback()
+            dialog.destroy()
+
+        controls = tk.Frame(dialog, bg=BG)
+        controls.pack(fill="x", padx=22, pady=16)
+        button_options = {
+            "bg": CARD_2, "fg": TEXT, "activebackground": BORDER, "activeforeground": TEXT,
+            "relief": "flat", "borderwidth": 0, "cursor": "hand2", "font": ("Segoe UI", 9, "bold"),
+            "padx": 10, "pady": 8,
+        }
+        tk.Button(controls, text="↑", command=lambda: move(-1), **button_options).pack(side="left")
+        tk.Button(controls, text="↓", command=lambda: move(1), **button_options).pack(side="left", padx=(6, 0))
+        tk.Button(controls, text="Retirer", command=remove, **button_options).pack(side="left", padx=(10, 0))
+        tk.Button(
+            controls, text="Lire maintenant", command=play_now, bg=ACCENT, fg="white",
+            activebackground=ACCENT_HOVER, activeforeground="white", relief="flat", borderwidth=0,
+            cursor="hand2", font=("Segoe UI", 9, "bold"), padx=10, pady=8,
+        ).pack(side="right")
+        tk.Button(controls, text="Fermer", command=dialog.destroy, **button_options).pack(side="right", padx=(0, 6))
+        refresh()
+
     def ensure_audio_engine(self):
         """Initialize pygame's mixer, retrying once with a standard audio setup."""
         if not pygame:
@@ -28,6 +145,7 @@ class PlayerMixin:
         track = self.get_selected_track()
         if not track:
             return
+        self.playback_tracks = []
         self.current_track = track
         self.current_artist = self.artist_name_for_track(track)
         self.start_playback()
@@ -76,8 +194,20 @@ class PlayerMixin:
         except Exception as error:
             self.is_playing = False
             self.play_btn.configure(text="▶")
-            self.player_subtitle.configure(text="Lecture impossible : vérifiez le fichier audio.")
-            messagebox.showerror("Impossible de lire le fichier", str(error))
+            detail = self.playback_error_message(error)
+            self.player_subtitle.configure(text=detail)
+            messagebox.showerror("Impossible de lire le fichier", f"{detail}\n\nDétail technique : {error}")
+
+    def playback_error_message(self, error):
+        path = getattr(self.current_track, "path", None)
+        if not path or not path.is_file():
+            return "Fichier introuvable : vérifiez que le MP3 n’a pas été déplacé ou supprimé."
+        message = str(error).lower()
+        if "device" in message or "audio" in message or "mixer" in message:
+            return "Le périphérique audio est indisponible : vérifiez la sortie son de Windows."
+        if "mp3" in message or "format" in message or "decode" in message:
+            return "Ce fichier audio semble corrompu ou dans un format non pris en charge."
+        return "Lecture impossible : vérifiez que le fichier est un MP3 lisible."
 
     def toggle_play(self):
         if not self.current_track:
@@ -101,7 +231,14 @@ class PlayerMixin:
         self._play_adjacent(-1)
 
     def _play_adjacent(self, direction):
-        tracks = self.visible_tracks or getattr(self, "current_tracks", [])
+        if direction > 0 and self.play_queue:
+            self.current_track = self.play_queue.pop(0)
+            self.current_artist = self.artist_name_for_track(self.current_track)
+            self.update_queue_button()
+            self.select_current_track_in_table()
+            self.start_playback()
+            return True
+        tracks = self.playback_tracks or self.visible_tracks or getattr(self, "current_tracks", [])
         if not tracks:
             return False
         if self.current_track not in tracks:
@@ -131,10 +268,45 @@ class PlayerMixin:
                 return
 
     def set_volume(self, value):
-        self.volume_var.set(float(value))
+        volume = max(0.0, min(1.0, float(value)))
+        self.volume_var.set(volume)
+        if volume > 0:
+            self.volume_before_mute = volume
+            self.is_muted = False
+        if hasattr(self, "mute_btn"):
+            self.mute_btn.configure(text="🔊" if not self.is_muted else "🔇")
+        if hasattr(self, "volume_label"):
+            self.volume_label.configure(text=f"{round(volume * 100)}%")
         if pygame and self.player_ready:
-            pygame.mixer.music.set_volume(float(value))
+            pygame.mixer.music.set_volume(volume)
         self.save_player_preferences()
+
+    def toggle_mute(self):
+        if self.is_muted:
+            self.is_muted = False
+            self.set_volume(self.volume_before_mute or 0.75)
+            return
+        current_volume = self.volume_var.get()
+        if current_volume > 0:
+            self.volume_before_mute = current_volume
+        self.is_muted = True
+        self.volume_var.set(0)
+        if pygame and self.player_ready:
+            pygame.mixer.music.set_volume(0)
+        self.mute_btn.configure(text="🔇")
+        self.volume_label.configure(text="0%")
+
+    def handle_player_shortcut(self, event, action):
+        """Global Space/arrow controls while leaving text-entry shortcuts untouched."""
+        if isinstance(event.widget, (tk.Entry, tk.Text)):
+            return None
+        if action == "toggle":
+            self.toggle_play()
+        elif action == "previous":
+            self.play_previous()
+        else:
+            self.play_next()
+        return "break"
 
     def save_player_preferences(self):
         self.settings["volume"] = self.volume_var.get()

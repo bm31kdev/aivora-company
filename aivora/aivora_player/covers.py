@@ -26,6 +26,22 @@ class CoverMixin:
             self.cover_photo = photo
             self.cover_label.configure(image=photo, text="", width=0, height=0)
 
+    def get_release_cover(self, tracks):
+        """Return a small cached cover for a release row in the library tree."""
+        if not tracks or not Image or not ImageTk:
+            return None
+        release_key = f"release:{tracks[0].path.parent}"
+        photo = self.release_cover_cache.get(release_key)
+        if photo is not None:
+            return photo
+        image = self.load_cover_image(tracks[0])
+        if image is None:
+            return None
+        image.thumbnail((42, 42), Image.LANCZOS)
+        photo = ImageTk.PhotoImage(image)
+        self.release_cover_cache[release_key] = photo
+        return photo
+
     def load_cover_image(self, track):
         artwork = self.extract_embedded_artwork(track)
         if artwork:

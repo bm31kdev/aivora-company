@@ -11,6 +11,7 @@ class Track:
     path: Path
     title: str
     duration: int = 0
+    disc_number: int = 1
     track_number: int = 0
     album: str = ""
     artist: str = ""
@@ -93,12 +94,13 @@ class LibraryMixin:
         kind = self.release_kind_for_count(len(paths))
         tracks = []
         for path in paths:
-            title, duration, album, artist, track_number = self.read_track(path)
+            title, duration, album, artist, disc_number, track_number = self.read_track(path)
             tracks.append(
                 Track(
                     path=path,
                     title=title,
                     duration=duration,
+                    disc_number=disc_number,
                     track_number=track_number,
                     album=album,
                     artist=artist,
@@ -109,7 +111,7 @@ class LibraryMixin:
         return sorted(tracks, key=self.track_sort_key)
 
     def read_track(self, path):
-        title, duration, album, artist, track_number = path.stem, 0, "", "", 0
+        title, duration, album, artist, disc_number, track_number = path.stem, 0, "", "", 1, 0
         if MP3:
             try:
                 audio = MP3(path)
@@ -120,11 +122,13 @@ class LibraryMixin:
                     album = str(audio.tags.get("TALB"))
                 if audio.tags and audio.tags.get("TPE1"):
                     artist = str(audio.tags.get("TPE1"))
+                if audio.tags and audio.tags.get("TPOS"):
+                    disc_number = self.parse_track_number(audio.tags.get("TPOS")) or 1
                 if audio.tags and audio.tags.get("TRCK"):
                     track_number = self.parse_track_number(audio.tags.get("TRCK"))
             except Exception:
                 pass
-        return title, duration, album, artist, track_number
+        return title, duration, album, artist, disc_number, track_number
 
     @staticmethod
     def parse_track_number(value):
@@ -136,6 +140,8 @@ class LibraryMixin:
     def track_sort_key(track):
         """Keep numbered tracks first; retain a stable readable fallback for unnumbered files."""
         return (
+            track.disc_number <= 0,
+            track.disc_number or 1,
             track.track_number <= 0,
             track.track_number or 0,
             track.title.casefold(),
@@ -238,35 +244,49 @@ class LibraryMixin:
             if (not query or query in f"{track.title} {track.album} {track.artist} {track.release}".lower())
             and (allowed_paths is None or str(track.path) in allowed_paths)
         ]
+        self.playback_tracks = []
         self.populate_release_tree(show_artist=allowed_paths is not None)
         self.update_track_actions(self.current_track)
 
     def populate_release_tree(self, show_artist=False):
         self.tracks.delete(*self.tracks.get_children())
         self.track_items = {}
+        self.release_items = {}
         for release_index, (release_key, tracks) in enumerate(self.group_releases(self.visible_tracks, show_artist)):
             artist, release, kind = release_key
             prefix = f"{artist}  •  " if artist else ""
             label = f"{prefix}{release or 'Titres sans dossier'}"
             parent_id = f"release-{release_index}"
+            total_duration = sum(track.duration for track in tracks)
+            cover = self.get_release_cover(tracks)
+            self.release_items[parent_id] = tracks
             self.tracks.insert(
                 "",
                 "end",
                 iid=parent_id,
                 text=label,
-                values=(f"{kind} · {len(tracks)} titre{'s' if len(tracks) > 1 else ''}", ""),
+                image=cover or "",
+                values=(
+                    f"{kind} · {len(tracks)} titre{'s' if len(tracks) > 1 else ''} · {self.format_duration(total_duration)}",
+                    "Double-cliquez pour lire",
+                    "",
+                ),
                 open=True,
                 tags=("release",),
             )
             for track_index, track in enumerate(tracks):
                 item_id = f"track-{release_index}-{track_index}"
                 self.track_items[item_id] = track
+                number_label = (
+                    f"CD {track.disc_number or 1} · {track.track_number:02d}  "
+                    if track.track_number else ""
+                )
                 self.tracks.insert(
                     parent_id,
                     "end",
                     iid=item_id,
-                    text=track.title,
-                    values=(self.format_duration(track.duration), track.album or kind),
+                    text=f"{number_label}{track.title}",
+                    values=(self.format_duration(track.duration), track.album or kind, "＋ Lire ensuite"),
                     tags=("track",),
                 )
         if self.current_track in self.visible_tracks:
@@ -279,14 +299,47 @@ class LibraryMixin:
     def select_track(self, _event=None):
         track = self.get_selected_track()
         if track:
-            self.current_track = track
-            self.current_artist = self.artist_name_for_track(track)
-            self.show_cover(track)
-            self.track_meta.configure(
-                text=" • ".join(filter(None, (track.artist or self.current_artist, track.release or track.album)))
-                or "Métadonnées non disponibles"
-            )
+            self.selected_track = track
+            if not self.is_playing:
+                artist = self.artist_name_for_track(track)
+                self.show_cover(track)
+                self.track_meta.configure(
+                    text=" • ".join(filter(None, (track.artist or artist, track.release or track.album)))
+                    or "Métadonnées non disponibles"
+                )
             self.update_track_actions(track)
+
+    def queue_tree_track(self, event):
+        """Treat the action cell in each track row as a compact queue button."""
+        if self.tracks.identify_column(event.x) != "#3":
+            return None
+        item_id = self.tracks.identify_row(event.y)
+        track = self.track_items.get(item_id)
+        if track:
+            self.enqueue_track(track)
+            return "break"
+        return None
+
+    def play_tree_item(self, _event=None):
+        """Play a track, or start the complete release selected in the tree."""
+        selected = self.tracks.selection()
+        if not selected:
+            return "break"
+        release_tracks = self.release_items.get(selected[0])
+        if release_tracks:
+            self.play_release(release_tracks)
+        else:
+            self.play_selected()
+        return "break"
+
+    def play_release(self, tracks):
+        if not tracks:
+            return
+        self.playback_tracks = list(tracks)
+        self.current_track = tracks[0]
+        self.current_artist = self.artist_name_for_track(self.current_track)
+        self.select_current_track_in_table()
+        self.start_playback()
 
     def artist_name_for_track(self, track):
         for artist, tracks in self.artists.items():

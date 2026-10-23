@@ -30,7 +30,7 @@ if errorlevel 1 (
     if errorlevel 1 goto failed
 )
 
-echo Demarrage d'Aivora V1.1.02 et Aivora Studio V1.0...
+echo Demarrage d'Aivora V1.1.03 et Aivora Studio V1.0...
 start "Aivora" ".venv\Scripts\python.exe" "aivora\app.py"
 start "Aivora Studio" /d "aivora studio" "..\.venv\Scripts\python.exe" -m aivora_studio
 exit /b 0

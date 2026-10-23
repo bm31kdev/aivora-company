@@ -117,10 +117,21 @@ class InterfaceMixin:
             activebackground=BORDER, activeforeground=TEXT, relief="flat", borderwidth=0,
             cursor="hand2", font=("Segoe UI", 9, "bold"), padx=12, pady=9,
         ).pack(side="left", padx=(8, 0))
+        tk.Button(
+            actions, text="☷  Lire ensuite", command=self.queue_selected_track, bg=CARD_2, fg=TEXT,
+            activebackground=BORDER, activeforeground=TEXT, relief="flat", borderwidth=0,
+            cursor="hand2", font=("Segoe UI", 9, "bold"), padx=12, pady=9,
+        ).pack(side="left", padx=(8, 0))
+        self.queue_btn = tk.Button(
+            actions, text="☷  File (0)", command=self.show_play_queue, bg=CARD_2, fg=TEXT,
+            activebackground=BORDER, activeforeground=TEXT, relief="flat", borderwidth=0,
+            cursor="hand2", font=("Segoe UI", 9, "bold"), padx=12, pady=9,
+        )
+        self.queue_btn.pack(side="right")
         tk.Label(
-            actions, text="Choisissez un artiste, puis double-cliquez sur un titre pour le lire.",
+            actions, text="Sélectionnez un titre puis « Lire ensuite » pour choisir la suite.",
             bg=BG, fg=MUTED, font=("Segoe UI", 9),
-        ).pack(side="left", padx=(14, 0))
+        ).pack(side="right", padx=(0, 14))
 
         content = tk.Frame(self, bg=BG)
         content.pack(fill="both", expand=True, padx=30, pady=(0, 15))
@@ -157,7 +168,7 @@ class InterfaceMixin:
         table_frame.pack(fill="both", expand=True, padx=14, pady=(0, 14))
         self.tracks = ttk.Treeview(
             table_frame,
-            columns=("duration", "format"),
+            columns=("duration", "format", "queue"),
             show="tree headings",
             selectmode="browse",
             style="ArtistPage.Treeview",
@@ -165,18 +176,21 @@ class InterfaceMixin:
         self.tracks.heading("#0", text="SORTIE / TITRE")
         self.tracks.heading("duration", text="DURÉE / FORMAT")
         self.tracks.heading("format", text="ALBUM")
+        self.tracks.heading("queue", text="SUIVANT")
         self.tracks.column("#0", width=430, anchor="w")
         self.tracks.column("duration", width=155, anchor="center")
         self.tracks.column("format", width=180, anchor="w")
+        self.tracks.column("queue", width=125, anchor="center", stretch=False)
         self.tracks.tag_configure("release", foreground=ACCENT_HOVER, font=("Segoe UI", 10, "bold"))
         self.tracks.tag_configure("track", foreground=TEXT)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tracks.yview)
         self.tracks.configure(yscrollcommand=scrollbar.set)
         self.tracks.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        self.tracks.bind("<Double-1>", lambda _event: self.play_selected())
-        self.tracks.bind("<Return>", lambda _event: self.play_selected())
+        self.tracks.bind("<Double-1>", self.play_tree_item)
+        self.tracks.bind("<Return>", self.play_tree_item)
         self.tracks.bind("<<TreeviewSelect>>", self.select_track)
+        self.tracks.bind("<Button-1>", self.queue_tree_track, add="+")
 
         player = tk.Frame(self, bg=CARD, highlightbackground=BORDER, highlightthickness=1)
         # Insert the player before the expandable library area so it always keeps
@@ -280,9 +294,20 @@ class InterfaceMixin:
         tk.Label(secondary_controls, text="Volume", bg=CARD, fg=MUTED, font=("Segoe UI", 8)).pack(
             side="left", padx=(0, 4)
         )
+        self.mute_btn = tk.Button(
+            secondary_controls, text="🔊", command=self.toggle_mute, bg=CARD_2, fg=TEXT,
+            activebackground=BORDER, activeforeground=TEXT, relief="flat", borderwidth=0,
+            cursor="hand2", font=("Segoe UI", 9, "bold"), padx=8, pady=5,
+        )
+        self.mute_btn.pack(side="left", padx=(0, 5))
         tk.Scale(
-            secondary_controls, from_=0, to=1, resolution=0.05, orient="horizontal",
-            variable=self.volume_var, command=self.set_volume, showvalue=False, length=76,
+            secondary_controls, from_=0, to=1, resolution=0.01, orient="horizontal",
+            variable=self.volume_var, command=self.set_volume, showvalue=False, length=90,
             bg=CARD, fg=MUTED, troughcolor=CARD_2, activebackground=ACCENT,
             highlightthickness=0, sliderrelief="flat",
         ).pack(side="left")
+        self.volume_label = tk.Label(
+            secondary_controls, text=f"{round(self.volume_var.get() * 100)}%", bg=CARD, fg=MUTED,
+            font=("Segoe UI", 8), width=4, anchor="e",
+        )
+        self.volume_label.pack(side="left", padx=(4, 0))
