@@ -26,28 +26,62 @@ def list_artist_folder_names(monitored_root, excluded_root, should_cancel=None):
     def record_error(error):
         errors.append((getattr(error, "filename", monitored_root), str(error)))
 
-    for directory, folders, _ in os.walk(
-        monitored_root,
-        topdown=True,
-        onerror=record_error,
-        followlinks=False,
-    ):
-        if should_cancel and should_cancel():
-            break
-        folders[:] = sorted(
-            (
-                folder
-                for folder in folders
-                if not is_excluded(os.path.join(directory, folder))
-                and not os.path.islink(os.path.join(directory, folder))
-            ),
-            key=str.casefold,
-        )
-        if is_excluded(directory):
-            continue
-        names.update(folders)
+    try:
+        with os.scandir(monitored_root) as entries:
+            for entry in entries:
+                if should_cancel and should_cancel():
+                    break
+                if (
+                    entry.is_dir(follow_symlinks=False)
+                    and not entry.is_symlink()
+                    and not is_excluded(entry.path)
+                ):
+                    names.add(entry.name)
+    except OSError as error:
+        record_error(error)
 
     return sorted(names, key=str.casefold), errors
+
+
+def list_album_folder_names(artist_folder):
+    """List only direct album folders of one artist, never following links."""
+    if not artist_folder or not os.path.isdir(artist_folder):
+        return []
+    try:
+        with os.scandir(artist_folder) as entries:
+            return sorted(
+                (
+                    entry.name
+                    for entry in entries
+                    if entry.is_dir(follow_symlinks=False) and not entry.is_symlink()
+                ),
+                key=str.casefold,
+            )
+    except OSError:
+        return []
+
+
+def get_existing_album_folder(artist_folder, album_name):
+    """Resolve an existing direct album folder while keeping the path contained."""
+    safe_name = clean_filename(album_name)
+    if not safe_name:
+        raise ValueError("Le nom de l’album est invalide.")
+    artist_folder = os.path.abspath(artist_folder)
+    artist_real = os.path.realpath(artist_folder)
+    with os.scandir(artist_folder) as entries:
+        for entry in entries:
+            if entry.name.casefold() != safe_name.casefold():
+                continue
+            if entry.is_symlink() or not entry.is_dir(follow_symlinks=False):
+                raise OSError("Le dossier album sélectionné est invalide.")
+            folder = os.path.abspath(entry.path)
+            try:
+                if os.path.commonpath((artist_real, os.path.realpath(folder))).casefold() != artist_real.casefold():
+                    raise OSError("Le dossier album se trouve hors du dossier artiste.")
+            except ValueError as error:
+                raise OSError("Le dossier album se trouve sur un autre volume.") from error
+            return folder
+    raise FileNotFoundError(f"Le dossier album « {album_name} » est introuvable.")
 
 
 def get_or_create_artist_folder(monitored_root, artist_name):

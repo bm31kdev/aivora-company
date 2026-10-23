@@ -47,6 +47,8 @@ class AivoraStudio(
 
         self.artist_entries = []
         self.artist_folder_names = []
+        self.album_folder_names = []
+        self.album_var = tk.StringVar(value="")
         self.artist_folder_scan_errors = []
         self.artist_folder_scan_running = False
         self.artist_folder_scan_paths = None

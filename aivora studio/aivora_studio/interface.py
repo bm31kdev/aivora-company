@@ -5,6 +5,7 @@ from .dependencies import (
     threading,
     tk,
     tkfont,
+    messagebox,
     simpledialog,
 )
 from . import config
@@ -26,12 +27,17 @@ from .config import (
 from .helpers import (
     uppercase_text,
 )
-from .artist_folders import list_artist_folder_names
+from .artist_folders import (
+    get_or_create_artist_folder,
+    list_album_folder_names,
+    list_artist_folder_names,
+)
 
 
 class InterfaceMixin:
 
     CREATE_ARTIST_OPTION = "＋ Créer un nouveau dossier artiste…"
+    NO_ALBUM_OPTION = "— Aucun dossier album —"
 
     def setup_styles(self):
 
@@ -406,17 +412,28 @@ class InterfaceMixin:
         for name in self.artist_folder_names:
             menu.add_command(
                 label=name,
-                command=lambda selected=name, variable=item["variable"]:
-                    variable.set(selected),
+                command=lambda selected=name, artist_item=item:
+                    self.select_artist_folder(artist_item, selected),
             )
         menu.add_separator()
         menu.add_command(
             label=self.CREATE_ARTIST_OPTION,
-            command=lambda variable=item["variable"]:
-                self.create_artist_from_menu(variable),
+            command=lambda artist_item=item:
+                self.create_artist_from_menu(artist_item),
         )
 
-    def create_artist_from_menu(self, variable):
+    def select_artist_folder(self, item, name):
+        item["variable"].set(name)
+        if item is not self.artist_entries[0]:
+            return
+        try:
+            self.move_current_file_for_selection(name)
+            self.refresh_album_options(name)
+        except (OSError, ValueError) as error:
+            messagebox.showerror("DÉPLACEMENT IMPOSSIBLE", str(error), parent=self)
+
+    def create_artist_from_menu(self, item):
+        variable = item["variable"]
         current = variable.get()
         name = simpledialog.askstring(
             "Créer un dossier artiste",
@@ -426,6 +443,12 @@ class InterfaceMixin:
         )
         if name and name.strip():
             variable.set(uppercase_text(name))
+            if item is self.artist_entries[0]:
+                try:
+                    self.move_current_file_for_selection(variable.get())
+                    self.refresh_album_options(variable.get())
+                except (OSError, ValueError) as error:
+                    messagebox.showerror("DÉPLACEMENT IMPOSSIBLE", str(error), parent=self)
             self.artist_folder_hint.config(
                 text=(
                     "Le dossier sera créé sous "
@@ -433,6 +456,43 @@ class InterfaceMixin:
                 ),
                 fg=ACCENT_HOVER,
             )
+
+    def refresh_album_options(self, artist_name=None):
+        artist_name = artist_name or (self.artist_entries[0]["variable"].get() if self.artist_entries else "")
+        names = []
+        if artist_name:
+            try:
+                artist_folder = get_or_create_artist_folder(config.MONITORED_FOLDER, artist_name)
+                names = list_album_folder_names(artist_folder)
+            except (OSError, ValueError):
+                names = []
+        self.album_folder_names = names
+        menu = self.album_menu["menu"]
+        menu.delete(0, tk.END)
+        menu.add_command(label=self.NO_ALBUM_OPTION, command=lambda: self.select_album_folder(""))
+        for name in names:
+            menu.add_command(label=name, command=lambda selected=name: self.select_album_folder(selected))
+        self.album_var.set(self.NO_ALBUM_OPTION)
+        self.album_menu.config(state="normal" if names else "disabled")
+
+    def get_selected_album_folder_name(self):
+        value = self.album_var.get()
+        return "" if value == self.NO_ALBUM_OPTION else value.strip()
+
+    def select_album_folder(self, album_name):
+        self.album_var.set(album_name or self.NO_ALBUM_OPTION)
+        if album_name:
+            self.entries["album"].delete(0, tk.END)
+            self.entries["album"].insert(0, uppercase_text(album_name))
+        if not album_name or not self.artist_entries:
+            return
+        artist_name = self.artist_entries[0]["variable"].get().strip()
+        if not artist_name:
+            return
+        try:
+            self.move_current_file_for_selection(artist_name, album_name)
+        except (OSError, ValueError) as error:
+            messagebox.showerror("DÉPLACEMENT IMPOSSIBLE", str(error), parent=self)
 
     def update_content_scroll_region(self, event=None):
 
@@ -857,6 +917,37 @@ class InterfaceMixin:
                 "<KeyRelease>",
                 lambda event, e=entry: self.force_uppercase(e),
             )
+
+            if key == "album":
+                self.album_menu = tk.OptionMenu(
+                    form,
+                    self.album_var,
+                    self.NO_ALBUM_OPTION,
+                )
+                self.album_menu.config(
+                    bg=CARD_2,
+                    fg=TEXT,
+                    activebackground=ACCENT,
+                    activeforeground="white",
+                    relief="flat",
+                    borderwidth=0,
+                    highlightthickness=1,
+                    highlightbackground=BORDER,
+                    highlightcolor=ACCENT,
+                    font=("Segoe UI", 9, "bold"),
+                    padx=8,
+                    pady=4,
+                    state="disabled",
+                )
+                self.album_menu["menu"].config(
+                    bg=CARD_2,
+                    fg=TEXT,
+                    activebackground=ACCENT,
+                    activeforeground="white",
+                    font=("Segoe UI", 9),
+                )
+                self.album_menu.grid(row=row, column=2, sticky="e", padx=(8, 0), pady=5)
+                self.album_var.set(self.NO_ALBUM_OPTION)
 
         form.columnconfigure(1, weight=1)
 

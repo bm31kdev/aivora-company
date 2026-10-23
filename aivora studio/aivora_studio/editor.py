@@ -42,10 +42,28 @@ from .file_locks import (
     describe_locking_processes,
     find_locking_processes,
 )
-from .artist_folders import get_or_create_artist_folder
+from .artist_folders import get_existing_album_folder, get_or_create_artist_folder
 
 
 class EditorMixin:
+
+    def move_current_file_for_selection(self, artist_name, album_name=""):
+        """Move the loaded file as soon as the primary artist or album is chosen."""
+        if not self.current_file:
+            return None
+        artist_folder = get_or_create_artist_folder(config.MONITORED_FOLDER, artist_name)
+        destination_folder = artist_folder
+        if album_name:
+            destination_folder = get_existing_album_folder(artist_folder, album_name)
+        source_path = self.current_file
+        self.current_file = move_file_to_folder(source_path, destination_folder)
+        filename = os.path.basename(self.current_file)
+        self.drop_title.config(text=f"✓  {filename}")
+        self.status_label.config(
+            text=f"Fichier déplacé · {os.path.basename(destination_folder)} · {filename}",
+            fg=SUCCESS,
+        )
+        return destination_folder
 
     def offer_to_close_locking_application(self, path):
         """Explain a Windows lock and only close an explicitly safe process."""
@@ -742,12 +760,17 @@ class EditorMixin:
         ):
             return None
 
-        folder_name = os.path.basename(
-            os.path.dirname(self.current_file)
+        parent_folder = os.path.dirname(self.current_file)
+        folder_name = os.path.basename(parent_folder).strip()
+        artist_folder_name = os.path.basename(
+            os.path.dirname(parent_folder)
         ).strip()
         artist_name = artists[0].strip()
+        expected_artist = clean_filename(artist_name).casefold()
 
-        if folder_name.casefold() == clean_filename(artist_name).casefold():
+        # A file may live directly in ARTISTE or in ARTISTE/ALBUM.
+        # In the second case the direct parent is the album, not the artist.
+        if folder_name.casefold() == expected_artist or artist_folder_name.casefold() == expected_artist:
             return None
 
         return folder_name, artist_name
@@ -801,9 +824,16 @@ class EditorMixin:
                         config.MONITORED_FOLDER,
                         first_artist,
                     )
+                    destination_folder = artist_folder
+                    selected_album = self.get_selected_album_folder_name()
+                    if selected_album:
+                        destination_folder = get_existing_album_folder(
+                            artist_folder,
+                            selected_album,
+                        )
                     self.current_file = move_file_to_folder(
                         source_path,
-                        artist_folder,
+                        destination_folder,
                     )
                     break
                 except PermissionError as error:
@@ -857,7 +887,7 @@ class EditorMixin:
             )
             destination_message = (
                 f"\n\nFICHIER DÉPLACÉ DANS LE DOSSIER DU PREMIER ARTISTE :\n"
-                f"{artist_folder}"
+                f"{destination_folder}"
             )
 
             self.status_label.config(
@@ -877,7 +907,7 @@ class EditorMixin:
                     (
                         "LES MODIFICATIONS ONT BIEN ÉTÉ ENREGISTRÉES.\n\n"
                         f"NOM DU FICHIER :\n{filename.upper()}\n\n"
-                        f"FICHIER DÉPLACÉ VERS :\n{artist_folder}\n\n"
+                        f"FICHIER DÉPLACÉ VERS :\n{destination_folder}\n\n"
                         f"LE DOSSIER D'ORIGINE « {folder_name} » NE "
                         f"CORRESPONDAIT PAS AU PREMIER ARTISTE "
                         f"« {artist_name} »."

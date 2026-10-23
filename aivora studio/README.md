@@ -1,4 +1,4 @@
-# Aivora Studio V1.0
+# Aivora Studio V1.0.01
 
 Aivora Studio est une application Windows en Python/Tkinter pour modifier les
 métadonnées audio, gérer les pochettes et organiser les fichiers.
@@ -8,7 +8,7 @@ métadonnées audio, gérer les pochettes et organiser les fichiers.
 Depuis la racine du dépôt, double-cliquez sur
 [`Start Aivora Company.bat`](../Start%20Aivora%20Company.bat). Il crée un seul
 environnement Python, installe les dépendances partagées, puis lance Aivora et
-Aivora Studio V1.0 ensemble.
+Aivora Studio V1.0.01 ensemble.
 
 Python 3 doit être installé et accessible avec `py` ou `python`. Une connexion
 Internet est nécessaire seulement lors de la première installation.
@@ -31,6 +31,8 @@ local.
 - Édition de métadonnées et de pochettes.
 - Analyse BPM, forme d’onde, conversion et réparation audio.
 - Recherche de doublons et rangement dans le dossier du premier artiste.
+- Choix d’un artiste puis déplacement immédiat dans son dossier ; choix d’un
+  album existant dans un menu et rangement dans son sous-dossier.
 - Paramètres des dossiers, des fonctions et de la palette visuelle.
 
-Version actuelle : **V1.0**.
+Version actuelle : **V1.0.01**.
