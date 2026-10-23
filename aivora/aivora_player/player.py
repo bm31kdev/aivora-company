@@ -33,8 +33,10 @@ class PlayerMixin:
             start_at = self.settings["last_position"] if resume else 0
             try:
                 pygame.mixer.music.play(start=start_at)
+                self.playback_offset = start_at
             except (TypeError, pygame.error):
                 pygame.mixer.music.play()
+                self.playback_offset = 0
             self.is_playing = True
             self.play_btn.configure(text="❚❚")
             self.now_playing.configure(text=self.current_track.title)
@@ -47,9 +49,10 @@ class PlayerMixin:
             )
             self.settings["last_track"] = str(self.current_track.path)
             self.settings["last_position"] = 0
-            self.playback_position = 0
+            self.playback_position = self.playback_offset
+            self.configure_progress(self.current_track.duration, self.playback_position)
             self.record_recent_track(self.current_track)
-            self.after(1000, self.record_playback_position)
+            self.after(500, self.record_playback_position)
             self.after(500, self.monitor_playback)
         except Exception as error:
             messagebox.showerror("Impossible de lire le fichier", str(error))
@@ -98,10 +101,12 @@ class PlayerMixin:
     def select_current_track_in_table(self):
         if self.current_track not in self.visible_tracks:
             return
-        index = self.visible_tracks.index(self.current_track)
-        self.tracks.selection_set(str(index))
-        self.tracks.focus(str(index))
-        self.tracks.see(str(index))
+        for item_id, track in self.track_items.items():
+            if track == self.current_track:
+                self.tracks.selection_set(item_id)
+                self.tracks.focus(item_id)
+                self.tracks.see(item_id)
+                return
 
     def set_volume(self, value):
         self.volume_var.set(float(value))
@@ -120,9 +125,49 @@ class PlayerMixin:
             return
         position = pygame.mixer.music.get_pos()
         if position >= 0:
-            self.playback_position = int(position / 1000)
+            self.playback_position = self.playback_offset + int(position / 1000)
             self.settings["last_position"] = self.playback_position
-        self.after(1000, self.record_playback_position)
+            self.update_progress_display()
+        self.after(500, self.record_playback_position)
+
+    def configure_progress(self, duration, position=0):
+        """Configure the scrubber for the selected track."""
+        maximum = max(1, duration or 0)
+        self.progress_scale.configure(to=maximum, state="normal" if duration else "disabled")
+        self.duration_label.configure(text=self.format_duration(duration))
+        self.progress_var.set(min(position, maximum))
+        self.position_label.configure(text=self.format_duration(position))
+
+    def update_progress_display(self):
+        if not self.current_track or self.is_seeking:
+            return
+        duration = self.current_track.duration
+        shown_position = min(self.playback_position, duration) if duration else self.playback_position
+        self.progress_var.set(shown_position)
+        self.position_label.configure(text=self.format_duration(shown_position))
+        self.duration_label.configure(text=self.format_duration(duration))
+
+    def begin_seek(self, _event=None):
+        self.is_seeking = True
+
+    def finish_seek(self, _event=None):
+        target = int(self.progress_var.get())
+        self.is_seeking = False
+        if not self.current_track or not pygame or not self.player_ready:
+            self.update_progress_display()
+            return
+        was_playing = self.is_playing
+        try:
+            pygame.mixer.music.play(start=target)
+        except (TypeError, pygame.error):
+            self.update_progress_display()
+            return
+        self.playback_offset = target
+        self.playback_position = target
+        self.settings["last_position"] = target
+        if not was_playing:
+            pygame.mixer.music.pause()
+        self.update_progress_display()
 
     def monitor_playback(self):
         """Advance automatically when pygame reaches the end of a track."""
@@ -140,7 +185,9 @@ class PlayerMixin:
             pygame.mixer.music.stop()
         self.is_playing = False
         self.playback_position = 0
+        self.playback_offset = 0
         self.settings["last_position"] = 0
+        self.configure_progress(self.current_track.duration if self.current_track else 0)
         self.play_btn.configure(text="▶")
 
     def close_app(self):

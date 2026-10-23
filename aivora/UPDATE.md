@@ -1,5 +1,13 @@
 # Journal des mises à jour — Aivora
 
+## Version 1.1.0 — 23 octobre 2026
+
+- Page d’artiste organisée par dossiers de sortie, avec les pistes dépliables sous chaque sortie.
+- Un dossier de plus de 5 titres est classé Album ; un dossier d’un titre est classé Single.
+- Les dossiers de 2 à 5 titres restent disponibles sous « Autre sortie ».
+- Pochettes intégrées ou fichiers `cover`, `folder` et `front` dans le dossier de la sortie.
+- Barre de progression avec temps écoulé, durée et recherche dans la lecture.
+
 ## Version 1.0.2 — 23 octobre 2026
 
 - Stockage des réglages aligné sur la convention AppData d’Aivora Studio.

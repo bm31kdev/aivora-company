@@ -1,4 +1,4 @@
-"""Shared settings and visual tokens for Aivora V1.0.2."""
+"""Shared settings and visual tokens for Aivora V1.1.0."""
 
 import json
 import os
@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 
 APP_NAME = "Aivora"
-VERSION = "1.0.2"
+VERSION = "1.1.0"
 
 # Same base palette as Aivora Studio.
 BG = "#101218"
@@ -36,6 +36,16 @@ DEFAULT_SETTINGS = {
 }
 
 VERSION_HISTORY = (
+    (
+        "1.1.0",
+        "Pages d’artiste et lecteur enrichi",
+        (
+            "Chaque dossier artiste devient une page regroupée par sorties.",
+            "Les dossiers de 6 titres ou plus sont des albums ; ceux d’un titre sont des singles.",
+            "Les dossiers de 2 à 5 titres restent accessibles comme autres sorties.",
+            "Pochettes intégrées ou fichiers cover/folder/front et barre de progression avec recherche dans le titre.",
+        ),
+    ),
     (
         "1.0.2",
         "Paramètres et modaux harmonisés",

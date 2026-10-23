@@ -20,6 +20,7 @@ class InterfaceMixin:
             "Treeview", background=[("selected", ACCENT)],
             foreground=[("selected", "#FFFFFF")],
         )
+        style.configure("ArtistPage.Treeview", rowheight=34)
 
     def build_interface(self):
         """Build the same header, cards and action hierarchy as Studio."""
@@ -155,14 +156,20 @@ class InterfaceMixin:
         table_frame = tk.Frame(track_panel, bg=CARD)
         table_frame.pack(fill="both", expand=True, padx=14, pady=(0, 14))
         self.tracks = ttk.Treeview(
-            table_frame, columns=("title", "time", "album"), show="headings", selectmode="browse",
+            table_frame,
+            columns=("duration", "format"),
+            show="tree headings",
+            selectmode="browse",
+            style="ArtistPage.Treeview",
         )
-        self.tracks.heading("title", text="TITRE")
-        self.tracks.heading("time", text="DURÉE")
-        self.tracks.heading("album", text="ALBUM")
-        self.tracks.column("title", width=400, anchor="w")
-        self.tracks.column("time", width=90, anchor="center")
-        self.tracks.column("album", width=220, anchor="w")
+        self.tracks.heading("#0", text="SORTIE / TITRE")
+        self.tracks.heading("duration", text="DURÉE / FORMAT")
+        self.tracks.heading("format", text="ALBUM")
+        self.tracks.column("#0", width=430, anchor="w")
+        self.tracks.column("duration", width=155, anchor="center")
+        self.tracks.column("format", width=180, anchor="w")
+        self.tracks.tag_configure("release", foreground=ACCENT_HOVER, font=("Segoe UI", 10, "bold"))
+        self.tracks.tag_configure("track", foreground=TEXT)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tracks.yview)
         self.tracks.configure(yscrollcommand=scrollbar.set)
         self.tracks.pack(side="left", fill="both", expand=True)
@@ -195,6 +202,35 @@ class InterfaceMixin:
         self.player_subtitle.pack(anchor="w", pady=(2, 0))
         self.track_meta = tk.Label(player_info, text="", bg=CARD, fg=ACCENT_HOVER, font=("Segoe UI", 8))
         self.track_meta.pack(anchor="w", pady=(2, 0))
+        progress_row = tk.Frame(player_info, bg=CARD)
+        progress_row.pack(fill="x", pady=(10, 0))
+        self.position_label = tk.Label(
+            progress_row, text="0:00", bg=CARD, fg=MUTED, font=("Segoe UI", 8), width=5, anchor="w"
+        )
+        self.position_label.pack(side="left")
+        self.progress_scale = tk.Scale(
+            progress_row,
+            from_=0,
+            to=1,
+            resolution=1,
+            orient="horizontal",
+            variable=self.progress_var,
+            showvalue=False,
+            bg=CARD,
+            fg=MUTED,
+            troughcolor=CARD_2,
+            activebackground=ACCENT,
+            highlightthickness=0,
+            sliderrelief="flat",
+            cursor="hand2",
+        )
+        self.progress_scale.pack(side="left", fill="x", expand=True, padx=8)
+        self.progress_scale.bind("<ButtonPress-1>", self.begin_seek)
+        self.progress_scale.bind("<ButtonRelease-1>", self.finish_seek)
+        self.duration_label = tk.Label(
+            progress_row, text="—", bg=CARD, fg=MUTED, font=("Segoe UI", 8), width=5, anchor="e"
+        )
+        self.duration_label.pack(side="left")
         player_actions = tk.Frame(player_content, bg=CARD)
         player_actions.pack(side="right", anchor="e", pady=(12, 0))
         self.previous_btn = tk.Button(

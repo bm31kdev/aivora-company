@@ -1,4 +1,6 @@
-"""Library indexing and artist/track selection."""
+"""Library indexing, artist pages and release-aware track selection."""
+
+from collections import defaultdict
 
 from .dependencies import MP3, Path, dataclass, threading
 
@@ -10,12 +12,24 @@ class Track:
     duration: int = 0
     album: str = ""
     artist: str = ""
+    release: str = ""
+    release_kind: str = ""
 
 
 class LibraryMixin:
+    ALBUM_MINIMUM_TRACKS = 6
+
     @staticmethod
     def format_duration(seconds):
         return f"{seconds // 60}:{seconds % 60:02d}" if seconds else "—"
+
+    @classmethod
+    def release_kind_for_count(cls, count):
+        if count >= cls.ALBUM_MINIMUM_TRACKS:
+            return "Album"
+        if count == 1:
+            return "Single"
+        return "Autre sortie"
 
     def scan_library(self):
         self.artist_title.configure(text="Analyse de la bibliothèque…")
@@ -23,6 +37,7 @@ class LibraryMixin:
         self.artist_list.delete(0, "end")
         self.tracks.delete(*self.tracks.get_children())
         self.visible_tracks = []
+        self.track_items = {}
         threading.Thread(target=self._scan_worker, daemon=True).start()
 
     def _scan_worker(self):
@@ -41,18 +56,51 @@ class LibraryMixin:
                     excluded and artist_dir.resolve() == excluded.resolve()
                 ):
                     continue
-                try:
-                    tracks = [
-                        Track(path, *self.read_track(path))
-                        for path in artist_dir.rglob("*.mp3")
-                    ]
-                except OSError:
-                    continue
+                tracks = self.read_artist_releases(artist_dir)
                 if tracks:
-                    found[artist_dir.name] = sorted(
-                        tracks, key=lambda track: track.title.lower()
-                    )
+                    found[artist_dir.name] = tracks
         self.after(0, lambda: self.finish_scan(found))
+
+    def read_artist_releases(self, artist_dir):
+        """Read each direct child folder as a release on an artist page."""
+        releases = []
+        try:
+            release_dirs = sorted(
+                (item for item in artist_dir.iterdir() if item.is_dir()),
+                key=lambda item: item.name.lower(),
+            )
+            loose_tracks = sorted(artist_dir.glob("*.mp3"), key=lambda item: item.name.lower())
+        except OSError:
+            return releases
+
+        for release_dir in release_dirs:
+            try:
+                paths = sorted(release_dir.rglob("*.mp3"), key=lambda item: item.name.lower())
+            except OSError:
+                continue
+            releases.extend(self.make_release_tracks(paths, release_dir.name))
+
+        # Keep legacy libraries usable when tracks have not yet been put in a release folder.
+        releases.extend(self.make_release_tracks(loose_tracks, "Titres sans dossier"))
+        return sorted(releases, key=lambda track: (track.release.lower(), track.title.lower()))
+
+    def make_release_tracks(self, paths, release_name):
+        kind = self.release_kind_for_count(len(paths))
+        tracks = []
+        for path in paths:
+            title, duration, album, artist = self.read_track(path)
+            tracks.append(
+                Track(
+                    path=path,
+                    title=title,
+                    duration=duration,
+                    album=album,
+                    artist=artist,
+                    release=release_name,
+                    release_kind=kind,
+                )
+            )
+        return tracks
 
     def read_track(self, path):
         title, duration, album, artist = path.stem, 0, "", ""
@@ -88,21 +136,20 @@ class LibraryMixin:
             )
 
     def populate_artist_list(self):
-        """Filter artists by name or by the metadata of their tracks."""
+        """Filter artists by name or by the metadata of their releases."""
         query = self.search_var.get().strip().lower()
         current = self.current_artist
         self.artist_list.delete(0, "end")
         names = []
         for name, tracks in self.artists.items():
             haystack = " ".join(
-                [name] + [f"{track.title} {track.album} {track.artist}" for track in tracks]
+                [name] + [f"{track.title} {track.album} {track.artist} {track.release}" for track in tracks]
             ).lower()
             if not query or query in haystack:
                 names.append(name)
                 self.artist_list.insert("end", name)
         if current in names:
-            index = names.index(current)
-            self.artist_list.selection_set(index)
+            self.artist_list.selection_set(names.index(current))
         return names
 
     def show_artist(self, _event=None):
@@ -111,12 +158,24 @@ class LibraryMixin:
             return
         self.current_artist = self.artist_list.get(selection[0])
         songs = self.artists[self.current_artist]
-        self.artist_title.configure(text=self.current_artist)
-        self.artist_detail.configure(
-            text=f"{len(songs)} morceau{'x' if len(songs) > 1 else ''}  •  Artiste identifié par son dossier"
-        )
         self.current_tracks = songs
+        self.update_artist_page_header(songs)
         self.apply_track_filters()
+
+    def update_artist_page_header(self, songs):
+        releases = self.group_releases(songs, include_artist=False)
+        albums = sum(1 for _, tracks in releases if tracks[0].release_kind == "Album")
+        singles = sum(1 for _, tracks in releases if tracks[0].release_kind == "Single")
+        other = len(releases) - albums - singles
+        summary = [f"{len(songs)} morceau{'x' if len(songs) > 1 else ''}"]
+        if albums:
+            summary.append(f"{albums} album{'s' if albums > 1 else ''}")
+        if singles:
+            summary.append(f"{singles} single{'s' if singles > 1 else ''}")
+        if other:
+            summary.append(f"{other} autre{'s' if other > 1 else ''} sortie{'s' if other > 1 else ''}")
+        self.artist_title.configure(text=self.current_artist)
+        self.artist_detail.configure(text="  •  ".join(summary))
 
     def on_search_change(self, *_args):
         names = self.populate_artist_list()
@@ -125,6 +184,17 @@ class LibraryMixin:
             self.show_artist()
         else:
             self.apply_track_filters()
+
+    @staticmethod
+    def group_releases(tracks, include_artist=True):
+        grouped = defaultdict(list)
+        for track in tracks:
+            key = (track.artist if include_artist else "", track.release, track.release_kind)
+            grouped[key].append(track)
+        return sorted(
+            grouped.items(),
+            key=lambda item: (item[0][0].lower(), item[0][1].lower()),
+        )
 
     def apply_track_filters(self):
         songs = getattr(self, "current_tracks", [])
@@ -141,34 +211,46 @@ class LibraryMixin:
             songs = [track for tracks in self.artists.values() for track in tracks]
         self.visible_tracks = [
             track for track in songs
-            if (not query or query in f"{track.title} {track.album} {track.artist}".lower())
+            if (not query or query in f"{track.title} {track.album} {track.artist} {track.release}".lower())
             and (allowed_paths is None or str(track.path) in allowed_paths)
         ]
+        self.populate_release_tree(show_artist=allowed_paths is not None)
+        self.update_track_actions(self.current_track)
+
+    def populate_release_tree(self, show_artist=False):
         self.tracks.delete(*self.tracks.get_children())
-        for index, song in enumerate(self.visible_tracks):
-            try:
-                location = str(
-                    song.path.parent.relative_to(
-                        Path(self.settings["library"]) / self.current_artist
-                    )
-                ) or "Singles"
-            except ValueError:
-                location = song.path.parent.name
+        self.track_items = {}
+        for release_index, (release_key, tracks) in enumerate(self.group_releases(self.visible_tracks, show_artist)):
+            artist, release, kind = release_key
+            prefix = f"{artist}  •  " if artist else ""
+            label = f"{prefix}{release or 'Titres sans dossier'}"
+            parent_id = f"release-{release_index}"
             self.tracks.insert(
                 "",
                 "end",
-                iid=str(index),
-                values=(song.title, self.format_duration(song.duration), song.album or location),
+                iid=parent_id,
+                text=label,
+                values=(f"{kind} · {len(tracks)} titre{'s' if len(tracks) > 1 else ''}", ""),
+                open=True,
+                tags=("release",),
             )
+            for track_index, track in enumerate(tracks):
+                item_id = f"track-{release_index}-{track_index}"
+                self.track_items[item_id] = track
+                self.tracks.insert(
+                    parent_id,
+                    "end",
+                    iid=item_id,
+                    text=track.title,
+                    values=(self.format_duration(track.duration), track.album or kind),
+                    tags=("track",),
+                )
         if self.current_track in self.visible_tracks:
             self.select_current_track_in_table()
-        self.update_track_actions(self.current_track)
 
     def get_selected_track(self):
         selected = self.tracks.selection()
-        if not selected:
-            return None
-        return self.visible_tracks[int(selected[0])]
+        return self.track_items.get(selected[0]) if selected else None
 
     def select_track(self, _event=None):
         track = self.get_selected_track()
@@ -177,7 +259,8 @@ class LibraryMixin:
             self.current_artist = self.artist_name_for_track(track)
             self.show_cover(track)
             self.track_meta.configure(
-                text=" • ".join(filter(None, (track.artist or self.current_artist, track.album))) or "Métadonnées non disponibles"
+                text=" • ".join(filter(None, (track.artist or self.current_artist, track.release or track.album)))
+                or "Métadonnées non disponibles"
             )
             self.update_track_actions(track)
 
@@ -197,7 +280,9 @@ class LibraryMixin:
                     self.artist_list.selection_set(list(self.artist_list.get(0, "end")).index(artist))
                     self.show_artist()
                     self.current_track = track
+                    self.select_current_track_in_table()
                     self.show_cover(track)
                     self.now_playing.configure(text=track.title)
                     self.player_subtitle.configure(text="Dernier morceau prêt à reprendre")
+                    self.track_meta.configure(text=f"{artist} • {track.release}")
                     return
