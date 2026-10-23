@@ -179,15 +179,22 @@ class InterfaceMixin:
         self.tracks.bind("<<TreeviewSelect>>", self.select_track)
 
         player = tk.Frame(self, bg=CARD, highlightbackground=BORDER, highlightthickness=1)
-        player.pack(fill="x", padx=30, pady=(0, 20))
+        # Insert the player before the expandable library area so it always keeps
+        # its own space at the bottom of the window.
+        player.pack(fill="x", side="bottom", padx=30, pady=(0, 20), before=content)
         player_content = tk.Frame(player, bg=CARD)
-        player_content.pack(fill="x", padx=20, pady=14)
+        player_content.pack(fill="x", padx=20, pady=16)
+
+        # The player is deliberately split in three: current track on the left,
+        # transport centred, and secondary controls on the right.
+        player_top = tk.Frame(player_content, bg=CARD)
+        player_top.pack(fill="x")
         self.cover_label = tk.Label(
-            player_content, text="♪", bg=CARD_2, fg=ACCENT_HOVER, font=("Segoe UI", 34, "bold"),
-            width=5, height=2,
+            player_top, text="♪", bg=CARD_2, fg=ACCENT_HOVER, font=("Segoe UI", 28, "bold"),
+            width=4, height=2,
         )
         self.cover_label.pack(side="left", padx=(0, 14))
-        player_info = tk.Frame(player_content, bg=CARD)
+        player_info = tk.Frame(player_top, bg=CARD)
         player_info.pack(side="left", fill="x", expand=True)
         tk.Label(player_info, text="LECTEUR", bg=CARD, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(anchor="w")
         self.now_playing = tk.Label(
@@ -202,8 +209,8 @@ class InterfaceMixin:
         self.player_subtitle.pack(anchor="w", pady=(2, 0))
         self.track_meta = tk.Label(player_info, text="", bg=CARD, fg=ACCENT_HOVER, font=("Segoe UI", 8))
         self.track_meta.pack(anchor="w", pady=(2, 0))
-        progress_row = tk.Frame(player_info, bg=CARD)
-        progress_row.pack(fill="x", pady=(10, 0))
+        progress_row = tk.Frame(player_content, bg=CARD)
+        progress_row.pack(fill="x", pady=(14, 10))
         self.position_label = tk.Label(
             progress_row, text="0:00", bg=CARD, fg=MUTED, font=("Segoe UI", 8), width=5, anchor="w"
         )
@@ -231,47 +238,50 @@ class InterfaceMixin:
             progress_row, text="—", bg=CARD, fg=MUTED, font=("Segoe UI", 8), width=5, anchor="e"
         )
         self.duration_label.pack(side="left")
-        player_actions = tk.Frame(player_content, bg=CARD)
-        player_actions.pack(side="right", anchor="e", pady=(12, 0))
+
+        control_row = tk.Frame(player_content, bg=CARD)
+        control_row.pack(fill="x", ipady=1)
+
+        transport = tk.Frame(control_row, bg=CARD)
+        transport.place(relx=0.5, rely=0.5, anchor="center")
         self.previous_btn = tk.Button(
-            player_actions, text="◀◀", command=self.play_previous, bg=CARD_2, fg=TEXT,
-            activebackground=BORDER, activeforeground=TEXT, relief="flat", borderwidth=0,
-            cursor="hand2", font=("Segoe UI", 10, "bold"), padx=10, pady=9,
+            transport, text="⏮", command=self.play_previous, bg=CARD, fg=TEXT,
+            activebackground=CARD_2, activeforeground="white", relief="flat", borderwidth=0,
+            cursor="hand2", font=("Segoe UI Symbol", 14, "bold"), padx=11, pady=8,
         )
         self.previous_btn.pack(side="left", padx=(0, 8))
-        self.stop_btn = tk.Button(
-            player_actions, text="■", command=self.stop_playback, bg=CARD_2, fg=TEXT,
-            activebackground=BORDER, activeforeground=TEXT, relief="flat", borderwidth=0,
-            cursor="hand2", font=("Segoe UI", 12, "bold"), padx=13, pady=8,
-        )
-        self.stop_btn.pack(side="left", padx=(0, 8))
         self.play_btn = tk.Button(
-            player_actions, text="▶", command=self.toggle_play, bg=ACCENT, fg="white",
+            transport, text="▶", command=self.toggle_play, bg=ACCENT, fg="white",
             activebackground=ACCENT_HOVER, activeforeground="white", relief="flat",
-            borderwidth=0, cursor="hand2", font=("Segoe UI", 14, "bold"), padx=17, pady=7,
+            borderwidth=0, cursor="hand2", font=("Segoe UI Symbol", 17, "bold"), width=4, pady=6,
         )
-        self.play_btn.pack(side="left")
+        self.play_btn.pack(side="left", padx=2)
         self.next_btn = tk.Button(
-            player_actions, text="▶▶", command=self.play_next, bg=CARD_2, fg=TEXT,
-            activebackground=BORDER, activeforeground=TEXT, relief="flat", borderwidth=0,
-            cursor="hand2", font=("Segoe UI", 10, "bold"), padx=10, pady=9,
+            transport, text="⏭", command=self.play_next, bg=CARD, fg=TEXT,
+            activebackground=CARD_2, activeforeground="white", relief="flat", borderwidth=0,
+            cursor="hand2", font=("Segoe UI Symbol", 14, "bold"), padx=11, pady=8,
         )
         self.next_btn.pack(side="left", padx=(8, 0))
+
+        secondary_controls = tk.Frame(control_row, bg=CARD)
+        secondary_controls.pack(side="right")
         tk.Checkbutton(
-            player_actions, text="Aléatoire", variable=self.shuffle_var, command=self.save_player_preferences,
-            bg=CARD, fg=MUTED, selectcolor=CARD_2, activebackground=CARD, activeforeground=TEXT,
-            font=("Segoe UI", 8),
-        ).pack(side="left", padx=(14, 4))
+            secondary_controls, text="Aléatoire", variable=self.shuffle_var, command=self.save_player_preferences,
+            indicatoron=False, bg=CARD_2, fg=MUTED, selectcolor=ACCENT, activebackground=BORDER,
+            activeforeground=TEXT, relief="flat", borderwidth=0, font=("Segoe UI", 8, "bold"),
+            padx=8, pady=5,
+        ).pack(side="left", padx=(0, 5))
         tk.Checkbutton(
-            player_actions, text="Répéter", variable=self.repeat_var, command=self.save_player_preferences,
-            bg=CARD, fg=MUTED, selectcolor=CARD_2, activebackground=CARD, activeforeground=TEXT,
-            font=("Segoe UI", 8),
-        ).pack(side="left")
-        tk.Label(player_actions, text="Volume", bg=CARD, fg=MUTED, font=("Segoe UI", 8)).pack(
-            side="left", padx=(12, 4)
+            secondary_controls, text="Répéter", variable=self.repeat_var, command=self.save_player_preferences,
+            indicatoron=False, bg=CARD_2, fg=MUTED, selectcolor=ACCENT, activebackground=BORDER,
+            activeforeground=TEXT, relief="flat", borderwidth=0, font=("Segoe UI", 8, "bold"),
+            padx=8, pady=5,
+        ).pack(side="left", padx=(0, 10))
+        tk.Label(secondary_controls, text="Volume", bg=CARD, fg=MUTED, font=("Segoe UI", 8)).pack(
+            side="left", padx=(0, 4)
         )
         tk.Scale(
-            player_actions, from_=0, to=1, resolution=0.05, orient="horizontal",
+            secondary_controls, from_=0, to=1, resolution=0.05, orient="horizontal",
             variable=self.volume_var, command=self.set_volume, showvalue=False, length=76,
             bg=CARD, fg=MUTED, troughcolor=CARD_2, activebackground=ACCENT,
             highlightthickness=0, sliderrelief="flat",

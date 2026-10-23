@@ -1,5 +1,11 @@
 # Journal des mises à jour — Aivora
 
+## Version 1.2.0 — 23 octobre 2026
+
+- Commandes de lecture réorganisées dans une barre centrée, plus lisible.
+- Barre lecteur réservée au bas de la fenêtre afin qu’elle reste visible.
+- Initialisation et récupération du moteur audio renforcées.
+
 ## Version 1.1.01 — 23 octobre 2026
 
 - Les titres d’album et de sortie sont classés selon leur numéro de piste

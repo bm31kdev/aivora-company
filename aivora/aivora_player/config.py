@@ -1,4 +1,4 @@
-"""Shared settings and visual tokens for Aivora V1.1.01."""
+"""Shared settings and visual tokens for Aivora V1.2.0."""
 
 import json
 import os
@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 
 APP_NAME = "Aivora"
-VERSION = "1.1.01"
+VERSION = "1.2.0"
 
 # Same base palette as Aivora Studio.
 BG = "#101218"
@@ -36,6 +36,15 @@ DEFAULT_SETTINGS = {
 }
 
 VERSION_HISTORY = (
+    (
+        "1.2.0",
+        "Lecteur repensé et fiabilisé",
+        (
+            "Contrôles de lecture centrés, avec précédent et suivant autour du bouton principal.",
+            "La barre de lecture réserve sa place au bas de la fenêtre.",
+            "Initialisation audio renforcée avec une tentative de récupération en cas d’échec.",
+        ),
+    ),
     (
         "1.1.01",
         "Ordre des pistes corrigé",

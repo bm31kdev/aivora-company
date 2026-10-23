@@ -7,6 +7,23 @@ from .dependencies import messagebox, pygame
 
 
 class PlayerMixin:
+    def ensure_audio_engine(self):
+        """Initialize pygame's mixer, retrying once with a standard audio setup."""
+        if not pygame:
+            return False
+        if self.player_ready:
+            return True
+        try:
+            pygame.mixer.init()
+        except pygame.error:
+            # A previous failed initialization can leave the mixer half-open.
+            # Reset it before trying the standard desktop audio format once.
+            pygame.mixer.quit()
+            pygame.mixer.pre_init(44100, -16, 2, 512)
+            pygame.mixer.init()
+        self.player_ready = True
+        return True
+
     def play_selected(self):
         track = self.get_selected_track()
         if not track:
@@ -25,16 +42,18 @@ class PlayerMixin:
             )
             return
         try:
-            if not self.player_ready:
-                pygame.mixer.init()
-                self.player_ready = True
+            self.ensure_audio_engine()
             pygame.mixer.music.set_volume(self.volume_var.get())
             pygame.mixer.music.load(str(self.current_track.path))
             start_at = self.settings["last_position"] if resume else 0
-            try:
-                pygame.mixer.music.play(start=start_at)
-                self.playback_offset = start_at
-            except (TypeError, pygame.error):
+            if start_at > 0:
+                try:
+                    pygame.mixer.music.play(start=start_at)
+                    self.playback_offset = start_at
+                except (TypeError, pygame.error):
+                    pygame.mixer.music.play()
+                    self.playback_offset = 0
+            else:
                 pygame.mixer.music.play()
                 self.playback_offset = 0
             self.is_playing = True
@@ -55,6 +74,9 @@ class PlayerMixin:
             self.after(500, self.record_playback_position)
             self.after(500, self.monitor_playback)
         except Exception as error:
+            self.is_playing = False
+            self.play_btn.configure(text="▶")
+            self.player_subtitle.configure(text="Lecture impossible : vérifiez le fichier audio.")
             messagebox.showerror("Impossible de lire le fichier", str(error))
 
     def toggle_play(self):

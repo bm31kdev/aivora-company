@@ -19,7 +19,7 @@ class Aivora(
     SettingsMixin,
     tk.Tk,
 ):
-    """Aivora V1.1.01 player assembled with the Studio-style mixin architecture."""
+    """Aivora V1.2.0 player assembled with the Studio-style mixin architecture."""
 
     def __init__(self):
         super().__init__()
