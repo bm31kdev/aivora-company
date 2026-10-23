@@ -1,8 +1,8 @@
-# Aivora V1.1.0
+# Aivora V1.1.01
 
 Lecteur de musique local en Python/Tkinter. Son environnement et son thème sont alignés avec Aivora Studio V1.0.
 
-Version actuelle : **V1.1.0**.
+Version actuelle : **V1.1.01**.
 
 ## Architecture
 
@@ -41,6 +41,12 @@ Pour lancer seulement Aivora :
 Au premier lancement, aucun dossier n’est prérempli. Choisissez le dossier de votre bibliothèque et, si besoin, le dossier à exclure depuis les paramètres.
 
 Chaque dossier situé directement dans la bibliothèque est considéré comme **un seul artiste**, y compris les noms avec un `&` (par exemple `BELLO & DALLAS`). Les crédits dans les titres des MP3 ne modifient jamais cette règle : un morceau `LAGUI & HOOUZ` reste dans la discographie de l'artiste correspondant à son dossier.
+
+## Correctif V1.1.01
+
+- Les pistes d’un album ou d’une sortie sont désormais rangées selon le numéro
+  de piste des métadonnées (`TRCK`) : 1, 2, 3… Les fichiers non numérotés
+  restent ensuite classés de manière stable.
 
 ## Nouveautés de V1.1.0
 

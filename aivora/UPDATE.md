@@ -1,5 +1,11 @@
 # Journal des mises à jour — Aivora
 
+## Version 1.1.01 — 23 octobre 2026
+
+- Les titres d’album et de sortie sont classés selon leur numéro de piste
+  dans les métadonnées (`TRCK`) : la piste 1 apparaît en premier.
+- Les fichiers sans numéro de piste sont conservés après les pistes numérotées.
+
 ## Version 1.1.0 — 23 octobre 2026
 
 - Page d’artiste organisée par dossiers de sortie, avec les pistes dépliables sous chaque sortie.

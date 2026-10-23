@@ -1,4 +1,4 @@
-"""Shared settings and visual tokens for Aivora V1.1.0."""
+"""Shared settings and visual tokens for Aivora V1.1.01."""
 
 import json
 import os
@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 
 APP_NAME = "Aivora"
-VERSION = "1.1.0"
+VERSION = "1.1.01"
 
 # Same base palette as Aivora Studio.
 BG = "#101218"
@@ -36,6 +36,14 @@ DEFAULT_SETTINGS = {
 }
 
 VERSION_HISTORY = (
+    (
+        "1.1.01",
+        "Ordre des pistes corrigé",
+        (
+            "Les titres d’un album ou d’une sortie sont classés par numéro de piste dans les métadonnées.",
+            "Les fichiers sans numéro restent après les pistes numérotées, dans un ordre stable.",
+        ),
+    ),
     (
         "1.1.0",
         "Pages d’artiste et lecteur enrichi",

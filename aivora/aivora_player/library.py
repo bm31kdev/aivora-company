@@ -1,6 +1,7 @@
 """Library indexing, artist pages and release-aware track selection."""
 
 from collections import defaultdict
+import re
 
 from .dependencies import MP3, Path, dataclass, threading
 
@@ -10,6 +11,7 @@ class Track:
     path: Path
     title: str
     duration: int = 0
+    track_number: int = 0
     album: str = ""
     artist: str = ""
     release: str = ""
@@ -82,28 +84,32 @@ class LibraryMixin:
 
         # Keep legacy libraries usable when tracks have not yet been put in a release folder.
         releases.extend(self.make_release_tracks(loose_tracks, "Titres sans dossier"))
-        return sorted(releases, key=lambda track: (track.release.lower(), track.title.lower()))
+        return sorted(
+            releases,
+            key=lambda track: (track.release.lower(), *self.track_sort_key(track)),
+        )
 
     def make_release_tracks(self, paths, release_name):
         kind = self.release_kind_for_count(len(paths))
         tracks = []
         for path in paths:
-            title, duration, album, artist = self.read_track(path)
+            title, duration, album, artist, track_number = self.read_track(path)
             tracks.append(
                 Track(
                     path=path,
                     title=title,
                     duration=duration,
+                    track_number=track_number,
                     album=album,
                     artist=artist,
                     release=release_name,
                     release_kind=kind,
                 )
             )
-        return tracks
+        return sorted(tracks, key=self.track_sort_key)
 
     def read_track(self, path):
-        title, duration, album, artist = path.stem, 0, "", ""
+        title, duration, album, artist, track_number = path.stem, 0, "", "", 0
         if MP3:
             try:
                 audio = MP3(path)
@@ -114,9 +120,27 @@ class LibraryMixin:
                     album = str(audio.tags.get("TALB"))
                 if audio.tags and audio.tags.get("TPE1"):
                     artist = str(audio.tags.get("TPE1"))
+                if audio.tags and audio.tags.get("TRCK"):
+                    track_number = self.parse_track_number(audio.tags.get("TRCK"))
             except Exception:
                 pass
-        return title, duration, album, artist
+        return title, duration, album, artist, track_number
+
+    @staticmethod
+    def parse_track_number(value):
+        """Return the first numeric value from an ID3 track number such as 03/12."""
+        match = re.search(r"\d+", str(value or ""))
+        return int(match.group()) if match else 0
+
+    @staticmethod
+    def track_sort_key(track):
+        """Keep numbered tracks first; retain a stable readable fallback for unnumbered files."""
+        return (
+            track.track_number <= 0,
+            track.track_number or 0,
+            track.title.casefold(),
+            track.path.name.casefold(),
+        )
 
     def finish_scan(self, found):
         self.artists = dict(sorted(found.items(), key=lambda item: item[0].lower()))

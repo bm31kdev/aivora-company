@@ -1,4 +1,4 @@
-"""Aivora V1.1.0 local music player."""
+"""Aivora V1.1.01 local music player."""
 
 from .config import VERSION
 
