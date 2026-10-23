@@ -39,7 +39,9 @@ class SettingsMixin:
             entries[key] = value
 
         def apply():
-            self.settings = {key: field.get().strip() for key, field in entries.items()}
+            self.settings.update(
+                {key: field.get().strip() for key, field in entries.items()}
+            )
             save_settings(self.settings)
             dialog.destroy()
             self.scan_library()
@@ -50,7 +52,7 @@ class SettingsMixin:
         ).pack(anchor="e", padx=28, pady=24)
 
     def show_version(self):
-        """Open the V1.0 modal from the header, like Aivora Studio."""
+        """Open the installed-version modal from the header."""
         self.open_about()
 
     def open_about(self):

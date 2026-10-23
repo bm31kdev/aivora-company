@@ -1,4 +1,4 @@
-"""Aivora player interface using the Aivora Studio V1.0 layout."""
+"""Aivora player interface using the Aivora Studio-inspired layout."""
 
 from .config import ACCENT, ACCENT_HOVER, APP_NAME, BG, BORDER, CARD, CARD_2, MUTED, TEXT, VERSION
 from .dependencies import tk, ttk
@@ -73,6 +73,30 @@ class InterfaceMixin:
             font=("Segoe UI", 8),
         ).pack(side="right", padx=(0, 14))
 
+        filters = tk.Frame(self, bg=CARD, highlightbackground=BORDER, highlightthickness=1)
+        filters.pack(fill="x", padx=30, pady=(0, 15))
+        tk.Label(filters, text="RECHERCHER", bg=CARD, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(
+            side="left", padx=(16, 8), pady=11
+        )
+        search_entry = tk.Entry(
+            filters, textvariable=self.search_var, bg=CARD_2, fg=TEXT, insertbackground=TEXT,
+            relief="flat", highlightthickness=1, highlightbackground=BORDER, highlightcolor=ACCENT,
+            font=("Segoe UI", 10),
+        )
+        search_entry.pack(side="left", fill="x", expand=True, pady=8)
+        tk.Label(filters, text="LISTE", bg=CARD, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(
+            side="left", padx=(16, 8)
+        )
+        self.playlist_menu = tk.OptionMenu(filters, self.playlist_var, self.VIEW_ALL)
+        self.playlist_menu.configure(
+            bg=CARD_2, fg=TEXT, activebackground=ACCENT, activeforeground="white",
+            relief="flat", borderwidth=0, highlightthickness=0, font=("Segoe UI", 9), padx=9,
+        )
+        self.playlist_menu["menu"].configure(bg=CARD_2, fg=TEXT, activebackground=ACCENT, activeforeground="white")
+        self.playlist_menu.pack(side="left", padx=(0, 16), pady=8)
+        self.search_var.trace_add("write", self.on_search_change)
+        self.refresh_playlist_menu()
+
         actions = tk.Frame(self, bg=BG)
         actions.pack(fill="x", padx=30, pady=(0, 15))
         tk.Button(
@@ -81,6 +105,17 @@ class InterfaceMixin:
             relief="flat", borderwidth=0, cursor="hand2", font=("Segoe UI", 10, "bold"),
             padx=18, pady=9,
         ).pack(side="left")
+        self.favorite_btn = tk.Button(
+            actions, text="☆  Favori", command=self.toggle_favorite, bg=CARD_2, fg=TEXT,
+            activebackground=BORDER, activeforeground=TEXT, relief="flat", borderwidth=0,
+            cursor="hand2", font=("Segoe UI", 9, "bold"), padx=12, pady=9,
+        )
+        self.favorite_btn.pack(side="left", padx=(8, 0))
+        tk.Button(
+            actions, text="＋ Ajouter à la liste", command=self.add_to_playlist, bg=CARD_2, fg=TEXT,
+            activebackground=BORDER, activeforeground=TEXT, relief="flat", borderwidth=0,
+            cursor="hand2", font=("Segoe UI", 9, "bold"), padx=12, pady=9,
+        ).pack(side="left", padx=(8, 0))
         tk.Label(
             actions, text="Choisissez un artiste, puis double-cliquez sur un titre pour le lire.",
             bg=BG, fg=MUTED, font=("Segoe UI", 9),
@@ -124,7 +159,7 @@ class InterfaceMixin:
         )
         self.tracks.heading("title", text="TITRE")
         self.tracks.heading("time", text="DURÉE")
-        self.tracks.heading("album", text="EMPLACEMENT")
+        self.tracks.heading("album", text="ALBUM")
         self.tracks.column("title", width=400, anchor="w")
         self.tracks.column("time", width=90, anchor="center")
         self.tracks.column("album", width=220, anchor="w")
@@ -134,24 +169,40 @@ class InterfaceMixin:
         scrollbar.pack(side="right", fill="y")
         self.tracks.bind("<Double-1>", lambda _event: self.play_selected())
         self.tracks.bind("<Return>", lambda _event: self.play_selected())
+        self.tracks.bind("<<TreeviewSelect>>", self.select_track)
 
         player = tk.Frame(self, bg=CARD, highlightbackground=BORDER, highlightthickness=1)
         player.pack(fill="x", padx=30, pady=(0, 20))
         player_content = tk.Frame(player, bg=CARD)
         player_content.pack(fill="x", padx=20, pady=14)
-        tk.Label(player_content, text="LECTEUR", bg=CARD, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(anchor="w")
+        self.cover_label = tk.Label(
+            player_content, text="♪", bg=CARD_2, fg=ACCENT_HOVER, font=("Segoe UI", 34, "bold"),
+            width=5, height=2,
+        )
+        self.cover_label.pack(side="left", padx=(0, 14))
+        player_info = tk.Frame(player_content, bg=CARD)
+        player_info.pack(side="left", fill="x", expand=True)
+        tk.Label(player_info, text="LECTEUR", bg=CARD, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(anchor="w")
         self.now_playing = tk.Label(
-            player_content, text="Sélectionnez un morceau", bg=CARD, fg=TEXT,
+            player_info, text="Sélectionnez un morceau", bg=CARD, fg=TEXT,
             font=("Segoe UI", 11, "bold"),
         )
         self.now_playing.pack(anchor="w", pady=(3, 0))
         self.player_subtitle = tk.Label(
-            player_content, text="Double-cliquez sur un titre pour le lire", bg=CARD,
+            player_info, text="Double-cliquez sur un titre pour le lire", bg=CARD,
             fg=MUTED, font=("Segoe UI", 9),
         )
         self.player_subtitle.pack(anchor="w", pady=(2, 0))
+        self.track_meta = tk.Label(player_info, text="", bg=CARD, fg=ACCENT_HOVER, font=("Segoe UI", 8))
+        self.track_meta.pack(anchor="w", pady=(2, 0))
         player_actions = tk.Frame(player_content, bg=CARD)
-        player_actions.pack(side="right", anchor="e", pady=(0, 20))
+        player_actions.pack(side="right", anchor="e", pady=(12, 0))
+        self.previous_btn = tk.Button(
+            player_actions, text="◀◀", command=self.play_previous, bg=CARD_2, fg=TEXT,
+            activebackground=BORDER, activeforeground=TEXT, relief="flat", borderwidth=0,
+            cursor="hand2", font=("Segoe UI", 10, "bold"), padx=10, pady=9,
+        )
+        self.previous_btn.pack(side="left", padx=(0, 8))
         self.stop_btn = tk.Button(
             player_actions, text="■", command=self.stop_playback, bg=CARD_2, fg=TEXT,
             activebackground=BORDER, activeforeground=TEXT, relief="flat", borderwidth=0,
@@ -164,3 +215,28 @@ class InterfaceMixin:
             borderwidth=0, cursor="hand2", font=("Segoe UI", 14, "bold"), padx=17, pady=7,
         )
         self.play_btn.pack(side="left")
+        self.next_btn = tk.Button(
+            player_actions, text="▶▶", command=self.play_next, bg=CARD_2, fg=TEXT,
+            activebackground=BORDER, activeforeground=TEXT, relief="flat", borderwidth=0,
+            cursor="hand2", font=("Segoe UI", 10, "bold"), padx=10, pady=9,
+        )
+        self.next_btn.pack(side="left", padx=(8, 0))
+        tk.Checkbutton(
+            player_actions, text="Aléatoire", variable=self.shuffle_var, command=self.save_player_preferences,
+            bg=CARD, fg=MUTED, selectcolor=CARD_2, activebackground=CARD, activeforeground=TEXT,
+            font=("Segoe UI", 8),
+        ).pack(side="left", padx=(14, 4))
+        tk.Checkbutton(
+            player_actions, text="Répéter", variable=self.repeat_var, command=self.save_player_preferences,
+            bg=CARD, fg=MUTED, selectcolor=CARD_2, activebackground=CARD, activeforeground=TEXT,
+            font=("Segoe UI", 8),
+        ).pack(side="left")
+        tk.Label(player_actions, text="Volume", bg=CARD, fg=MUTED, font=("Segoe UI", 8)).pack(
+            side="left", padx=(12, 4)
+        )
+        tk.Scale(
+            player_actions, from_=0, to=1, resolution=0.05, orient="horizontal",
+            variable=self.volume_var, command=self.set_volume, showvalue=False, length=76,
+            bg=CARD, fg=MUTED, troughcolor=CARD_2, activebackground=ACCENT,
+            highlightthickness=0, sliderrelief="flat",
+        ).pack(side="left")

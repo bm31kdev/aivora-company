@@ -1,17 +1,21 @@
-"""Playback controls for the selected library track."""
+"""Playback controls and persisted listening session."""
 
+import random
+
+from .config import save_settings
 from .dependencies import messagebox, pygame
 
 
 class PlayerMixin:
     def play_selected(self):
-        selected = self.tracks.selection()
-        if not selected or not self.current_artist:
+        track = self.get_selected_track()
+        if not track:
             return
-        self.current_track = self.artists[self.current_artist][int(selected[0])]
+        self.current_track = track
+        self.current_artist = self.artist_name_for_track(track)
         self.start_playback()
 
-    def start_playback(self):
+    def start_playback(self, resume=False):
         if not self.current_track:
             return
         if not pygame:
@@ -24,14 +28,29 @@ class PlayerMixin:
             if not self.player_ready:
                 pygame.mixer.init()
                 self.player_ready = True
+            pygame.mixer.music.set_volume(self.volume_var.get())
             pygame.mixer.music.load(str(self.current_track.path))
-            pygame.mixer.music.play()
+            start_at = self.settings["last_position"] if resume else 0
+            try:
+                pygame.mixer.music.play(start=start_at)
+            except (TypeError, pygame.error):
+                pygame.mixer.music.play()
             self.is_playing = True
             self.play_btn.configure(text="❚❚")
             self.now_playing.configure(text=self.current_track.title)
             self.player_subtitle.configure(
                 text=f"{self.current_artist}  •  {self.current_track.path.name}"
             )
+            self.show_cover(self.current_track)
+            self.track_meta.configure(
+                text=" • ".join(filter(None, (self.current_track.artist or self.current_artist, self.current_track.album)))
+            )
+            self.settings["last_track"] = str(self.current_track.path)
+            self.settings["last_position"] = 0
+            self.playback_position = 0
+            self.record_recent_track(self.current_track)
+            self.after(1000, self.record_playback_position)
+            self.after(500, self.monitor_playback)
         except Exception as error:
             messagebox.showerror("Impossible de lire le fichier", str(error))
 
@@ -40,7 +59,7 @@ class PlayerMixin:
             self.play_selected()
             return
         if not pygame or not self.player_ready:
-            self.start_playback()
+            self.start_playback(resume=True)
             return
         if self.is_playing:
             pygame.mixer.music.pause()
@@ -50,9 +69,86 @@ class PlayerMixin:
             self.play_btn.configure(text="❚❚")
         self.is_playing = not self.is_playing
 
+    def play_next(self):
+        self._play_adjacent(1)
+
+    def play_previous(self):
+        self._play_adjacent(-1)
+
+    def _play_adjacent(self, direction):
+        tracks = self.visible_tracks or getattr(self, "current_tracks", [])
+        if not tracks:
+            return False
+        if self.current_track not in tracks:
+            self.current_track = tracks[0]
+        elif self.shuffle_var.get() and len(tracks) > 1:
+            choices = [track for track in tracks if track != self.current_track]
+            self.current_track = random.choice(choices)
+        else:
+            index = tracks.index(self.current_track) + direction
+            if self.repeat_var.get():
+                index %= len(tracks)
+            elif not 0 <= index < len(tracks):
+                return False
+            self.current_track = tracks[index]
+        self.select_current_track_in_table()
+        self.start_playback()
+        return True
+
+    def select_current_track_in_table(self):
+        if self.current_track not in self.visible_tracks:
+            return
+        index = self.visible_tracks.index(self.current_track)
+        self.tracks.selection_set(str(index))
+        self.tracks.focus(str(index))
+        self.tracks.see(str(index))
+
+    def set_volume(self, value):
+        self.volume_var.set(float(value))
+        if pygame and self.player_ready:
+            pygame.mixer.music.set_volume(float(value))
+        self.save_player_preferences()
+
+    def save_player_preferences(self):
+        self.settings["volume"] = self.volume_var.get()
+        self.settings["shuffle"] = self.shuffle_var.get()
+        self.settings["repeat"] = self.repeat_var.get()
+        save_settings(self.settings)
+
+    def record_playback_position(self):
+        if not self.is_playing or not pygame or not self.player_ready:
+            return
+        position = pygame.mixer.music.get_pos()
+        if position >= 0:
+            self.playback_position = int(position / 1000)
+            self.settings["last_position"] = self.playback_position
+        self.after(1000, self.record_playback_position)
+
+    def monitor_playback(self):
+        """Advance automatically when pygame reaches the end of a track."""
+        if not self.is_playing or not pygame or not self.player_ready:
+            return
+        if pygame.mixer.music.get_busy():
+            self.after(500, self.monitor_playback)
+            return
+        if not self._play_adjacent(1):
+            self.stop_playback()
+
     def stop_playback(self):
         """Stop the player and reset the visible play state."""
         if pygame and self.player_ready:
             pygame.mixer.music.stop()
         self.is_playing = False
+        self.playback_position = 0
+        self.settings["last_position"] = 0
         self.play_btn.configure(text="▶")
+
+    def close_app(self):
+        if self.current_track:
+            self.settings["last_track"] = str(self.current_track.path)
+            self.settings["last_position"] = self.playback_position
+        self.save_player_preferences()
+        if pygame and self.player_ready:
+            pygame.mixer.music.stop()
+            pygame.mixer.quit()
+        self.destroy()
