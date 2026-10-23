@@ -1,4 +1,4 @@
-"""Compatibility launcher for Aivora V1.2.0.
+"""Compatibility launcher for Aivora V1.1.03.
 
 The application code lives in the modular ``aivora_player`` package, following
 the same architecture as Aivora Studio.
