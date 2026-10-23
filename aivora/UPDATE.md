@@ -1,6 +1,6 @@
 # Journal des mises à jour — Aivora
 
-## Version 1.1.03 — 23 octobre 2026
+## Version 1.1.02 — 23 octobre 2026
 
 - Commandes de lecture réorganisées dans une barre centrée, plus lisible.
 - Barre lecteur réservée au bas de la fenêtre afin qu’elle reste visible.
