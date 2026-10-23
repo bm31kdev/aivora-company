@@ -1,4 +1,4 @@
-"""Shared settings and visual tokens for Aivora V1.0.1."""
+"""Shared settings and visual tokens for Aivora V1.0.2."""
 
 import json
 import os
@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 
 APP_NAME = "Aivora"
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 
 # Same base palette as Aivora Studio.
 BG = "#101218"
@@ -18,9 +18,10 @@ ACCENT = "#7957FF"
 ACCENT_HOVER = "#9278FF"
 BORDER = "#303541"
 
-SETTINGS_PATH = Path(
-    os.environ.get("APPDATA", Path.home())
-) / "Aivora" / "settings.json"
+# Same per-application AppData layout as Aivora Studio.  The two applications
+# deliberately have separate files so their preferences never overwrite each other.
+SETTINGS_DIRECTORY = Path(os.environ.get("APPDATA", Path.home())) / APP_NAME
+SETTINGS_PATH = SETTINGS_DIRECTORY / "settings.json"
 DEFAULT_SETTINGS = {
     "library": "",
     "excluded": "",
@@ -33,6 +34,36 @@ DEFAULT_SETTINGS = {
     "playlists": {},
     "recently_played": [],
 }
+
+VERSION_HISTORY = (
+    (
+        "1.0.2",
+        "Paramètres et modaux harmonisés",
+        (
+            "Stockage des réglages organisé selon la convention AppData d’Aivora Studio.",
+            "Composants de dossier, cartes et actions des paramètres alignés sur Studio.",
+            "Guide des versions avec cartes, historique et défilement au même style que Studio.",
+        ),
+    ),
+    (
+        "1.0.1",
+        "Bibliothèque et lecture enrichies",
+        (
+            "Recherche par artiste, titre, album et métadonnée d’artiste.",
+            "Favoris, playlists locales et historique des derniers titres écoutés.",
+            "Lecture enchaînée, aléatoire, répétition, volume et reprise de lecture.",
+            "Pochettes MP3 intégrées et persistance des préférences de lecture.",
+        ),
+    ),
+    (
+        "1.0",
+        "Première version d’Aivora",
+        (
+            "Bibliothèque musicale locale organisée par dossiers d’artistes.",
+            "Lecture MP3, exclusion de dossier et paramètres enregistrés localement.",
+        ),
+    ),
+)
 
 
 def load_settings():
@@ -82,14 +113,14 @@ def normalize_settings(settings):
 
 
 def save_settings(settings):
-    """Persist settings atomically in ``%APPDATA%\\Aivora\\settings.json``."""
-    SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    """Persist settings atomically, using the same AppData convention as Studio."""
+    SETTINGS_DIRECTORY.mkdir(parents=True, exist_ok=True)
     temporary_path = None
     try:
         with tempfile.NamedTemporaryFile(
             mode="w",
             encoding="utf-8",
-            dir=SETTINGS_PATH.parent,
+            dir=SETTINGS_DIRECTORY,
             prefix=".settings-",
             suffix=".json",
             delete=False,
